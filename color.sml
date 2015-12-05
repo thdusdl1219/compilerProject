@@ -43,17 +43,20 @@ struct
         ) (reg_l) (regL)
       end
   in
-    RS.foldl (fn (reg, table : M.reg RT.table) => 
-              if(M.isvirtual reg)
-              then (
-                let val reg_h = choose_reg (IG.adj movegraph reg) reg
-                in if (reg = reg_h) then table 
-                   else (
-                    merge_node reg reg_h table 
-                   )
-                end
-              )
-              else table) (RT.empty) node
+    RS.foldl 
+    (fn (reg, table : M.reg RT.table) => 
+      if(M.isvirtual reg) then 
+        (
+          let 
+            val reg_h = choose_reg (IG.adj movegraph reg) reg
+          in 
+            if (reg = reg_h) then table 
+            else (
+              merge_node reg reg_h table 
+            )
+          end
+        )
+      else table) (RT.empty) node
   end
 
 
@@ -70,7 +73,7 @@ struct
    case stack of
       reg::tail => 
         let
-          val _ = (print("stack : " ); print_list stack)
+   (*       val _ = (print("stack : " ); print_list stack) *)
           val adjSet = IG.adj ig reg ; 
           val tmpReg = M.newReg (); 
           val colorSet =
@@ -114,7 +117,7 @@ struct
                     reg, hd (RS.listItems okColor)), spills =
                     #spills(colorResult)})))
                    in
-                    (print("spillset : " ); print_set spill;
+                    (
                     assignColor (tail, ig, palette, spill, precolored, colorResult)
                     table )
                    end)
@@ -141,8 +144,9 @@ struct
 
  fun simplify (lowdegs : RS.set, stack : M.reg list, adj : M.reg -> RS.set,
    redgs : M.reg -> M.reg -> unit) : M.reg list =
- let val regList = RS.listItems lowdegs; val _ = (print("lowdegs : ");  print_set
- lowdegs); val _ = app (fn reg => remove_edge
+ let 
+    val regList = RS.listItems lowdegs; 
+    val _ = app (fn reg => remove_edge
  (adj, redgs) (reg)) regList in regList @ stack end
 
 
@@ -157,9 +161,6 @@ struct
            then b else a) (hd (RS.listItems highdegs)) (tl (RS.listItems
            highdegs)) );
     in
-      print("highdegs : "); print_set highdegs;
-      print("reg : " ^ M.reg2name reg ^ "\n");
-      print("reg adj"); print_set (adj reg);
       remove_edge (adj, redgs) reg; 
       RS.add(spill, reg)
 

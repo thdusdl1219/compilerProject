@@ -35,7 +35,11 @@ structure Liveness : LIVENESS = struct
  end
 
  | compute_live_in(i::rest, live_at_end) {mention : M.reg -> unit, interfere : M.reg -> M.reg -> unit} (live_at : RS.set Symbol.table) (flow_graph : FG.graph) : RS.set = (* ErrorMsg.impossible "Liveness.analyze unimplemented" *)
-  let val live_out = compute_live_in(rest, live_at_end) {mention=mention, interfere=interfere} live_at flow_graph; val def_use = M.instr_def_use(i) in make_mention mention (#use(def_use)); make_mention mention (#def(def_use)); make_interfere interfere (#def(def_use)) live_out;
+  let 
+    val live_out = compute_live_in(rest, live_at_end) {mention=mention, interfere=interfere} live_at flow_graph; 
+    val def_use = M.instr_def_use(i) 
+ in 
+   make_mention mention (#use(def_use)); make_mention mention (#def(def_use)); make_interfere interfere (#def(def_use)) live_out;
     (case i of
       M.Branchz(_,_,lab) => (case Symbol.look(live_at, lab) of 
                                   SOME set => RS.union(#use(def_use), RS.difference(RS.union(set,live_out), #def(def_use)))
@@ -62,7 +66,8 @@ structure Liveness : LIVENESS = struct
 (*  let live_out = compute_live_in*)
 
 
- fun analyze_func {mention : M.reg -> unit, interfere: M.reg -> M.reg -> unit} (blocks :M.codeblock list) (live_at : RS.set Symbol.table) (flow_graph : FG.graph) (changed : bool) : (RS.set Symbol.table * bool) = 
+ fun analyze_func {mention : M.reg -> unit, interfere: M.reg -> M.reg -> unit} (blocks :M.codeblock list) (live_at : RS.set Symbol.table) (flow_graph : FG.graph) (changed : bool) : (RS.set Symbol.table * bool) =
+   (
    case blocks of
         (lab,block)::(next_lab, next_block)::t => (FG.mk_edge flow_graph {from=lab, to=next_lab}; 
         let val next_live_at = Symbol.look(live_at, next_lab) in
@@ -84,6 +89,7 @@ structure Liveness : LIVENESS = struct
               SOME cur_set => ( analyze_func {mention=mention, interfere=interfere} [] (Symbol.enter(live_at, lab, new)) flow_graph (changed orelse (not(RS.equal(cur_set, new)))))
             | NONE => ( analyze_func {mention=mention, interfere=interfere} [] (Symbol.enter(live_at, lab, new)) flow_graph true)) end
       | [] => (live_at, changed )
+      )
 
  fun printli say l (i:(Symbol.symbol * Mips.RegSet.set)) =
    (say (Symbol.name(#1(i))); say ":";

@@ -38,8 +38,7 @@ struct
        else (
           if RS.member(spills, rs) then
             (case List.find (fn (ind, reg) => reg = rs) (!spillL) of
-                  SOME((ind, reg)) =>  ((print ("(" ^ Int.toString ind ^ " : " ^
-                  M.reg2name reg ^ " \n"));
+                  SOME((ind, reg)) =>  (
                   [M.Lw(rd, (M.immed (ind * 4), M.reg "$sp"))])
                 | NONE => ErrorMsg.impossible ( "register isn't in spillL : " ^
                    M.reg2name rs ^ " : " ^ M.reg2name rd)
@@ -179,7 +178,6 @@ struct
            if (RS.member(spills, r) andalso RS.member(spills, ra))
            then let val tmpReg1 = M.newReg(); val tmpReg2 = M.newReg() in
              nonSpillL := tmpReg1 :: (tmpReg2 :: (!nonSpillL)) ;
-             print("Sw : " ^ M.reg2name ra ^ "\n");
              [M.Move(tmpReg1, r), M.Move(tmpReg2, ra), M.Sw(tmpReg1, (lab, tmpReg2))]
                 end
            else if (RS.member(spills, r))
@@ -306,28 +304,31 @@ struct
        val _ = (print "Spills: "; 
                 RS.app (fn r => (print (M.reg2name r); print " ")) spills;
 	        print "\n")
-       
-(*       val instrL = List.map (fn (l,instrs) => (l,List.map (M.rename_regs alloc) instrs)) instrL *)
-       val instrL = List.map (fn (l,instrs) => (l, flat(List.map (rename_spills
-       (spills, spillL, index, nonSpillL)) instrs))) instrL
+    in 
+      if(RS.isEmpty spills) then (instrL, alloc)
+      else
+        let
+(*        val instrL = List.map (fn (l,instrs) => (l,List.map (M.rename_regs alloc) instrs)) instrL *)
+          val instrL = List.map (fn (l,instrs) => (l, flat(List.map (rename_spills
+            (spills, spillL, index, nonSpillL)) instrs))) instrL
        
           val ig = Liveness.interference_graph instrL
           val movegraph = IG.newGraph()
           val _ = app (fn (_, l) => app (getmove movegraph) l) instrL
           val coloring = Color.color {interference = ig, moves=movegraph, 
-	                  spillCost = spillCost, palette=palette}
+	          spillCost = spillCost, palette=palette}
           val _ = Color.verify{complain=ErrorMsg.impossible, func=instrL, 
                                spillCost=spillCost, palette=palette, 
                                coloring=coloring}
           val {alloc, spills} = coloring 
-       val _ = (print "Spills: "; 
-                RS.app (fn r => (print (M.reg2name r); print " ")) spills;
-	        print "\n")
-(*       val instrL = List.map (fn (l,instrs) => (l,List.map (M.rename_regs alloc) instrs)) instrL *)
+          val _ = (print "Spills: "; 
+            RS.app (fn r => (print (M.reg2name r); print " ")) spills;
+	          print "\n")
+(*        val instrL = List.map (fn (l,instrs) => (l,List.map (M.rename_regs alloc) instrs)) instrL *)
           val instrL = (List.map (fn (l,instrs) => (l, flat(List.map (after_spills
-              (spills, spillL, index)) instrs))) instrL);
+            (spills, spillL, index)) instrs))) instrL);
     (* this is loop function when spillset isn't empty. If spillset is empty, it finish. *)
-     fun loop spillset (finalinstrL, finalAlloc) =
+      fun loop spillset (finalinstrL, finalAlloc) =
        if(RS.isEmpty (spillset)) then (finalinstrL, finalAlloc)
        else 
         let 
@@ -340,50 +341,56 @@ struct
                                spillCost=spillCost, palette=palette, 
                                coloring=coloring}
           val {alloc, spills} = coloring
-       val _ = (print "Spills: "; 
+        in
+          if(RS.isEmpty spills) then (finalinstrL, alloc)
+          else (
+            let
+              val _ = (print "Spills: "; 
                 RS.app (fn r => (print (M.reg2name r); print " ")) spills;
 	        print "\n")
-(*          val instrL = List.map (fn (l,instrs) => (l,List.map (M.rename_regs
-          alloc) instrs)) (finalinstrL) *)
-          val instrL = (List.map (fn (l,instrs) => (l, flat(List.map (rename_spills
-              (spills, spillL, index, nonSpillL)) instrs))) (finalinstrL)) 
-          val ig = Liveness.interference_graph instrL
-          val movegraph = IG.newGraph()
-          val _ = app (fn (_, l) => app (getmove movegraph) l) instrL
-          val coloring = Color.color {interference = ig, moves=movegraph, 
+(*            val instrL = List.map (fn (l,instrs) => (l,List.map (M.rename_regs
+              alloc) instrs)) (finalinstrL) *)
+              val instrL = (List.map (fn (l,instrs) => (l, flat(List.map (rename_spills
+                (spills, spillL, index, nonSpillL)) instrs))) (finalinstrL)) 
+              val ig = Liveness.interference_graph instrL
+              val movegraph = IG.newGraph()
+              val _ = app (fn (_, l) => app (getmove movegraph) l) instrL
+              val coloring = Color.color {interference = ig, moves=movegraph, 
 	                  spillCost = spillCost, palette=palette}
-          val _ = Color.verify{complain=ErrorMsg.impossible, func=instrL, 
+              val _ = Color.verify{complain=ErrorMsg.impossible, func=instrL, 
                                spillCost=spillCost, palette=palette, 
                                coloring=coloring}
-          val {alloc, spills} = coloring 
-       val _ = (print "Spills: "; 
+              val {alloc, spills} = coloring 
+              val _ = (print "Spills: "; 
                 RS.app (fn r => (print (M.reg2name r); print " ")) spills;
-	        print "\n")
-(*          val instrL = List.map (fn (l,instrs) => (l,List.map (M.rename_regs alloc) instrs)) instrL*)
-          val instrL = (List.map (fn (l,instrs) => (l, flat(List.map (after_spills
-              (spills, spillL, index)) instrs))) instrL);
-          val _ = print("hi\n")          
-
+	              print "\n")
+(*            val instrL = List.map (fn (l,instrs) => (l,List.map (M.rename_regs alloc) instrs)) instrL*)
+              val instrL = (List.map (fn (l,instrs) => (l, flat(List.map (after_spills
+                (spills, spillL, index)) instrs))) instrL);
+              val _ = print("hi\n")          
+            in
+              loop spills (instrL, alloc)
+            end )
+        end
         in
           loop spills (instrL, alloc)
-        end 
-   in
-     loop spills (instrL, alloc)
-  end
-   in
-
-     let
-       val (finalinstr, finalalloc) = alloc_sub instrL
-       val finalinstrL = List.map (fn (l, instrs) => (l, List.map (M.rename_regs finalalloc) instrs)) (finalinstr) 
-     in
-       (* make $sp := $sp - spill registers number *)
-      let val ((funlab, block)::rest) = finalinstrL; val st_instrL = if (!index)
-        = ~1 then finalinstrL 
-          else (funlab, (M.Arithi(M.Addi, M.reg "$sp", M.reg "$sp", M.immed (~((!index + 1)*4)))) :: block)::rest
-         val ed_instrL = make_end (st_instrL, index)
+        end
+    end
+    in
+      let
+        val (finalinstr, finalalloc) = alloc_sub instrL
+        val finalinstrL = List.map (fn (l, instrs) => (l, List.map (M.rename_regs finalalloc) instrs)) (finalinstr) 
       in
-        ed_instrL
+       (* make $sp := $sp - spill registers number *)
+        let 
+          val ((funlab, block)::rest) = finalinstrL; 
+          val st_instrL = 
+            if (!index) = ~1 then finalinstrL 
+            else (funlab, (M.Arithi(M.Addi, M.reg "$sp", M.reg "$sp", M.immed (~((!index + 1)*4)))) :: block)::rest
+          val ed_instrL = make_end (st_instrL, index)
+        in
+          ed_instrL
+        end
       end
-     end
-  end
+    end
 end

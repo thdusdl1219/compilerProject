@@ -310,7 +310,7 @@ struct
 
  fun rename_regs (table: allocation) =
  let fun f r = if isvirtual r
-	       then case RegTb.look(table,r) of SOME x => (print("rename_regs : " ^ reg2name r); x) 
+	       then case RegTb.look(table,r) of SOME x => (x) 
                   (*  | NONE => ErrorMsg.impossible ("rename_regs: "^
 	                              reg2name r)*)
                     | NONE => (r)
