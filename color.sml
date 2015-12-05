@@ -127,7 +127,6 @@ struct
  fun makeLowdegsHighdegs (adj : M.reg -> RS.set, nodes : unit -> RS.set, palette
    : RS.set) : {lowdegs : RS.set, highdegs : RS.set} = 
    let
-    val _ = (print("palette : "); print_set palette);
     val lowdegs = RS.filter (fn reg : M.reg => 
         RS.numItems(adj reg) < RS.numItems(palette) andalso RS.numItems(adj reg) > 0 andalso M.isvirtual reg
       ) (nodes()); 

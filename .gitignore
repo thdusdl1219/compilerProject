@@ -1,8 +1,8 @@
 *.fun
-*.py
 *.fun.stdout
 *.fun.noregalloc.s
 *.fun.s
+*.fun.out
 fun*/
 .cm/*
 .*.sml.swo
