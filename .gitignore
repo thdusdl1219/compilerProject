@@ -1,0 +1,9 @@
+*.fun
+*.py
+*.fun.stdout
+*.fun.noregalloc.s
+*.fun.s
+fun*/
+.cm/*
+.*.sml.swo
+.*.sml.swp
