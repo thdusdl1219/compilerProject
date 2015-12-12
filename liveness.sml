@@ -132,14 +132,14 @@ structure Liveness : LIVENESS = struct
  fun printgraph say g = IG.S.app (printadj say g) (IG.nodes g);
 
  fun interference_graph(func: M.funcode) =
-  let val _ = (print "################## LIVENESS: "; 
-               print (Symbol.name(#1(List.nth(func,0)))); print "\n")
+  let (*val _ = (print "################## LIVENESS: "; 
+               print (Symbol.name(#1(List.nth(func,0)))); print "\n")*)
       val g = IG.newGraph()
       fun mention (r: M.reg) = (IG.succ g r; ())
       fun interfere r1 r2 = IG.mk_edge g {from=r1,to=r2}
    in analyze {mention=mention,interfere=interfere} func;
-      print "################## INTERFERENCE GRAPH \n";
-      printgraph print g;
+      (*print "################## INTERFERENCE GRAPH \n";
+      printgraph print g;*)
       g
   end
 

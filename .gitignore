@@ -1,7 +1,6 @@
-*.fun
 *.fun.stdout
-*.fun.noregalloc.s
-*.fun.s
+*.noregalloc.s
+*.s
 *.fun.out
 fun*/
 .cm/*
