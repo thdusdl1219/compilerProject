@@ -2,7 +2,7 @@ structure Color : COLOR =
 struct
 
  structure IG = Liveness.IG
- structure M = Mips
+ structure M = X86
  structure RS = M.RegSet
  structure RT = M.RegTb
 

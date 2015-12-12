@@ -2,13 +2,13 @@ signature REGALLOC = sig
 (* alloc(f) returns mips code for function f that has all the temporaries
     replaced by mips regs and the load/store of spilled temps taken care of
 *)
- val alloc : Mips.funcode ->  Mips.funcode 
+ val alloc : X86.funcode ->  X86.funcode 
 end
 
 structure RegAlloc :> REGALLOC =
 struct
-   structure M = Mips
-   structure RS = Mips.RegSet
+   structure M = X86
+   structure RS = X86.RegSet
    structure IG = Liveness.IG
    structure RT = M.RegTb
    
@@ -57,7 +57,14 @@ struct
         else
           [M.Move(rd, rs)]
                    
-
+       | M.Arith1(i, r) =>
+           if RS.member(spills, r)
+           then let val tmpReg1 = M.newReg() in
+             nonSpillL := (tmpReg1 :: (!nonSpillL)) ;
+             [M.Move(tmpReg1, r), M.Arith1(i, tmpReg1), M.Move(r, tmpReg1)]
+                end
+           else
+             [M.Arith1(i, r)]
        | M.Arith2(i,rd,rs) => 
            if (RS.member(spills, rs) andalso RS.member(spills, rd))
            then let val tmpReg1 = M.newReg(); val tmpReg2 = M.newReg() in
@@ -200,25 +207,6 @@ struct
                 end
            else [M.Branchz(i,  r, lab)]
 
-       | M.Branchu(i,r1,r2,lab) => 
-           if (RS.member(spills, r1) andalso RS.member(spills, r2))
-           then let val tmpReg1 = M.newReg(); val tmpReg2 = M.newReg() in
-             nonSpillL := tmpReg1 :: (tmpReg2 :: (!nonSpillL)) ;
-             [M.Move(tmpReg1, r1), M.Move(tmpReg2, r2), M.Branchu(i, tmpReg1,
-             tmpReg2, lab)]
-                end
-           else if (RS.member(spills, r1))
-           then let val tmpReg1 = M.newReg() in 
-             nonSpillL := (tmpReg1 :: (!nonSpillL)) ;
-             [M.Move(tmpReg1, r1), M.Branchu(i, tmpReg1,  r2, lab)]
-                end
-           else if (RS.member(spills, r2))
-           then let val tmpReg1 = M.newReg() in
-             nonSpillL := (tmpReg1 :: (!nonSpillL)) ;
-             [M.Move(tmpReg1, r2), M.Branchu(i,  r1, tmpReg1, lab)]
-                end
-           else [M.Branchu(i,  r1,  r2, lab)]
-
        | M.Branch(i,r1,r2,lab) => 
            if (RS.member(spills, r1) andalso RS.member(spills, r2))
            then let val tmpReg1 = M.newReg(); val tmpReg2 = M.newReg() in
@@ -268,13 +256,45 @@ struct
 
        | M.Syscall => [M.Syscall]
        | M.Nop => [M.Nop]
+       | M.Leave => [M.Leave]
+       | M.Ret => [M.Ret]
+       | M.Push(r) =>
+           if RS.member(spills, r)
+           then let val tmpReg1 = M.newReg() in
+             nonSpillL := (tmpReg1 :: (!nonSpillL)) ;
+             [M.Move(tmpReg1, r), M.Push(tmpReg1)]
+                end
+           else
+             [M.Push(r)]
+      | M.Pop(r) =>
+           if RS.member(spills, r)
+           then let val tmpReg1 = M.newReg() in
+             nonSpillL := (tmpReg1 :: (!nonSpillL)) ;
+             [M.Pop(tmpReg1), M.Move(r, tmpReg1)]
+                end
+           else
+             [M.Pop(r)]
+     | M.Branch2(c, l) => [M.Branch2(c, l)]
+
       
    (* make restore $sp register in function epilog *)
    fun make_end (instrL : M.funcode, index) =
      case instrL of
        (l, instrs)::[] => if (!index) = ~1 then [(l, instrs)] else [(l,
-       (M.Arithi(M.Addi, M.reg "$sp", M.reg "$sp", M.immed ((!index + 1)*4)))::instrs)]
+       (M.Leave)::instrs)]
      | h::t => h :: make_end (t,index)
+   fun make_first (insrL : M.instruction list) (first:M.instruction list) index =
+     case insrL of
+       instr :: t =>
+        (case instr of
+           M.Move(r1, r2) =>
+            (if(r1 = M.reg "%ebp" andalso r2 = M.reg "%esp")
+            then
+              first @ (instr :: ((M.Arithi(M.Addi, M.reg "%esp", M.reg "%esp", M.immed (~((!index + 1)*4)))) :: t))
+            else 
+              make_first t (first @ [instr]) index)
+         | _ => make_first t (first @ [instr]) index)
+    | [] => first
 
    fun alloc(instrL as ((funlab,block)::rest) : M.funcode) = 
    let
@@ -292,7 +312,7 @@ struct
        val _ = app (fn (_,l) => app (getmove movegraph) l) instrL
        val _ = print "###### Move graph\n"
        val _ = Liveness.printgraph print movegraph
-       val palette = M.list2set (M.reg"$ra"::M.callerSaved @
+       val palette = M.list2set (M.reg"%eip"::M.callerSaved @
        M.calleeSaved)
        val coloring = Color.color {interference = ig, moves=movegraph, 
 	                  spillCost = spillCost, palette=palette}
@@ -357,7 +377,7 @@ struct
           val ((funlab, block)::rest) = finalinstrL; 
           val st_instrL = 
             if (!index) = ~1 then finalinstrL 
-            else (funlab, (M.Arithi(M.Addi, M.reg "$sp", M.reg "$sp", M.immed (~((!index + 1)*4)))) :: block)::rest
+            else (funlab, make_first block [] index)::rest
           val ed_instrL = make_end (st_instrL, index)
         in
           ed_instrL

@@ -66,6 +66,11 @@ signature X86s = sig
                may be defined before returning to r1 *)
     | Nop
     | Syscall
+    | Leave
+    | Ret
+    | Push of reg
+    | Pop of reg
+    | Branch2 of comparecode1 * lab
 
   and aop1 = Mul | Div
   and aop2 = Abs | Neg | Not

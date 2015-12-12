@@ -1,17 +1,17 @@
 signature LIVENESS = sig
-  structure IG: GRAPH where S=Mips.RegSet
-  val analyze: {mention: Mips.reg -> unit, 
-	        interfere: Mips.reg -> Mips.reg -> unit} ->
-               Mips.funcode -> unit
-  val interference_graph: Mips.funcode -> IG.graph
+  structure IG: GRAPH where S=X86.RegSet
+  val analyze: {mention: X86.reg -> unit, 
+	        interfere: X86.reg -> X86.reg -> unit} ->
+               X86.funcode -> unit
+  val interference_graph: X86.funcode -> IG.graph
   val printgraph: (string->unit) -> IG.graph -> unit
 end
 
    (* ErrorMsg.impossible "Liveness.analyze unimplemented" *)
 structure Liveness : LIVENESS = struct
-  structure IG = Graph(Mips.RegSet)
-  structure M = Mips
-  structure RS = Mips.RegSet
+  structure IG = Graph(X86.RegSet)
+  structure M = X86
+  structure RS = X86.RegSet
   structure FS = RedBlackSetFn(type ord_key = M.lab val compare = Symbol.compare)
   structure FG = Graph(FS)
 
@@ -45,9 +45,6 @@ structure Liveness : LIVENESS = struct
                                   SOME set => RS.union(#use(def_use), RS.difference(RS.union(set,live_out), #def(def_use)))
                                 | NONE => RS.union(#use(def_use), RS.difference(RS.union(RS.empty,live_out), #def(def_use)))) 
 
-    | M.Branchu(_,_,_,lab) => (case Symbol.look(live_at, lab) of
-                                    SOME set => RS.union(#use(def_use), RS.difference(RS.union(set,live_out), #def(def_use)))
-                                  | NONE => RS.union(#use(def_use), RS.difference(RS.union(RS.empty,live_out), #def(def_use)))) 
 
     | M.Branch(_,_,_,lab) => (case Symbol.look(live_at, lab) of 
                                    SOME set => RS.union(#use(def_use), RS.difference(RS.union(set,live_out), #def(def_use)))
@@ -91,7 +88,7 @@ structure Liveness : LIVENESS = struct
       | [] => (live_at, changed )
       )
 
- fun printli say l (i:(Symbol.symbol * Mips.RegSet.set)) =
+ fun printli say l (i:(Symbol.symbol * M.RegSet.set)) =
    (say (Symbol.name(#1(i))); say ":";
     IG.S.app (fn j => (say " "; say (M.reg2name j))) (#2(i));
     say "\n")

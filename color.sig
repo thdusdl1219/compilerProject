@@ -1,18 +1,18 @@
 signature COLOR = sig
 
-   type coloring = {alloc: Mips.allocation,
-	            spills: Mips.RegSet.set}
+   type coloring = {alloc: X86.allocation,
+	            spills: X86.RegSet.set}
 
    val color : {interference: Liveness.IG.graph,
 	        moves: Liveness.IG.graph,
-                spillCost: Mips.reg -> int,
-                palette: Mips.RegSet.set} -> 
+                spillCost: X86.reg -> int,
+                palette: X86.RegSet.set} -> 
                coloring
 
    val verify: {complain: string->unit,
-                func: Mips.funcode,
-                spillCost: Mips.reg -> int,
-                palette: Mips.RegSet.set,
+                func: X86.funcode,
+                spillCost: X86.reg -> int,
+                palette: X86.RegSet.set,
                 coloring: coloring}
                 -> unit
 

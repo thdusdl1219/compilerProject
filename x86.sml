@@ -84,6 +84,11 @@ struct
     | Jalr of reg * reg * reg list * reg list
     | Nop
     | Syscall
+    | Leave
+    | Ret
+    | Push of reg
+    | Pop of reg
+    | Branch2 of comparecode1 * lab
 
   and aop1 = Mul | Div
   and aop2 = Abs | Neg | Not
@@ -115,7 +120,7 @@ struct
         if(rs = rd) then
           ""
         else
-          "\t" ^ "mov" ^ "\t" ^ reg2name rs ^ ", " ^ reg2name rd ^
+          "\t" ^ "movl" ^ "\t" ^ reg2name rs ^ ", " ^ reg2name rd ^
           "\t#" ^ reg2name rd ^ " := " ^ reg2name rs ^ "\n"
 
     in
@@ -129,7 +134,7 @@ struct
       | Arith2 (op2, rd, rs) => (
           case op2 of 
             Abs =>
-              "\t" ^ "mov" ^ "\t" ^ reg2name rs ^ ", " ^ reg2name rd ^ "\n" ^
+              mov2string rs rd ^
               "\t" ^ "neg" ^ "\t" ^ reg2name rd ^ "\n" ^
               "\t" ^ "cmp" ^ "\t" ^ reg2name rs ^ ", " ^ reg2name rd ^ "\n" ^
               "\t" ^ "cmovl" ^ "\t" ^ reg2name rs ^ ", " ^ reg2name rd ^ 
@@ -201,13 +206,13 @@ struct
 	              ^ "\t# " ^ reg2name rd ^ " := " ^ reg2name rs
 	              ^ "^" ^ reg2name rt ^ "\n" 
           | Seq =>
-	          "\t" ^ "mov \t" ^ int2string 0 ^", "^ reg2name rd ^ "\n"
+	          "\t" ^ "movl \t" ^ int2string 0 ^", "^ reg2name rd ^ "\n"
             ^ "\t" ^ "cmp \t" ^ reg2name rt ^", "^ reg2name rs ^ "\n"
             ^ "\t" ^ "cmove \t" ^ int2string 1 ^", "^ reg2name rd 
 	          ^ "\t# " ^ reg2name rd ^" := " ^ reg2name rs ^ "==" ^ reg2name rt
 	          ^ "\n"
           | Slt =>
-            "\t" ^ "mov \t" ^ int2string (0) ^", "^ reg2name rd ^ "\n"
+            "\t" ^ "movl \t" ^ int2string (0) ^", "^ reg2name rd ^ "\n"
             ^ "\t" ^ "cmp \t" ^ reg2name rt ^", "^ reg2name rs ^ "\n"
             ^ "\t" ^ "cmovl \t" ^ int2string (1) ^", "^ reg2name rd 
 	          ^ "\t# " ^ reg2name rd ^" := " ^ reg2name rs ^ " < " ^ reg2name rt
@@ -228,7 +233,7 @@ struct
 	          ^ oper ^ (int2string (immed2int immed)) ^ "\n"
           end
       | Li (reg, im) =>
-	        "\t" ^ "mov \t" ^ int2string (immed2int im) ^", "^ reg2name reg
+	        "\t" ^ "movl \t" ^ int2string (immed2int im) ^", "^ reg2name reg
 	        ^ "\t# " ^ reg2name reg ^" := " ^ int2string (immed2int im)
 	        ^ "\n"
       | La (reg, lab) =>
@@ -236,12 +241,12 @@ struct
 	        ^ "\t# " ^ reg2name reg ^ " := " ^ lab2string lab 
 	        ^ "\n"
       | Lw (reg, (im, r)) =>
-	        "\t" ^ "mov \t" ^ addrint2string (immed2int im)
+	        "\t" ^ "movl \t" ^ addrint2string (immed2int im)
 	        ^ "(" ^ reg2name r ^ ")" ^ ", " ^  (reg2name reg)
 	        ^ "\t# " ^ reg2name reg ^ " := [" ^ reg2name r ^ "+"
 	        ^ addrint2string (immed2int im) ^ "]\n"
       | Sw (reg, (im, r)) =>
-	        "\t" ^ "mov \t" ^ reg2name reg ^ ", " ^ addrint2string (immed2int im) 
+	        "\t" ^ "movl \t" ^ reg2name reg ^ ", " ^ addrint2string (immed2int im) 
 	        ^ "("^ reg2name r ^")" 
 	        ^ "\t# [" ^ reg2name r ^"+"
 	        ^ addrint2string (immed2int im) ^ "] := " ^ reg2name reg ^"\n"
@@ -296,10 +301,37 @@ struct
         "\t"^"call \t*"^ (reg2name reg2)
 			  ^ "\t# (" 
         ^ regs2names def ^") := "
-	      ^ (if reg2name reg1 = "%eip" then "" else ErrorMsg.impossible ("jalr reg1 != $ra")) 
+	      ^ (if reg2name reg1 = "%eip" then "" else ErrorMsg.impossible ("jalr reg1 != %eip")) 
         ^ "call " ^ reg2name reg2 ^"(" ^ regs2names use ^ ")\n"
       | Syscall =>  "\t"^"int $0x80 \n"
-      | Nop => "nop"
+      | Nop => "nop\n"
+      | Leave => "leave\n"
+      | Ret => "ret\n"
+      | Push (reg) => "\t"^"push \t"^(reg2name reg) ^
+		    "\t# push " ^ reg2name reg ^ "\n"
+      | Pop (reg) => "\t"^"pop \t"^(reg2name reg) ^
+		    "\t# pop " ^ reg2name reg ^ "\n"
+      | Branch2 (cmp, lab) =>
+          let 
+            val jmpinst =
+              case cmp of
+                Lt =>
+                  "\t" ^ "jl \t" ^ lab2string lab ^ "\n"
+              | Eq =>
+                  "\t" ^ "je \t" ^ lab2string lab ^ "\n"
+              | Ne =>
+                  "\t" ^ "jne \t" ^ lab2string lab ^ "\n"
+              | Ge =>
+                  "\t" ^ "jge \t" ^ lab2string lab ^ "\n"
+              | Gt =>
+                  "\t" ^ "jg \t" ^ lab2string lab ^ "\n"
+              | Le =>
+                  "\t" ^ "jle \t" ^ lab2string lab ^ "\n"
+          in
+            jmpinst
+          end
+
+          
     end
 
 
@@ -338,6 +370,11 @@ struct
    | Syscall => ErrorMsg.impossible "Syscall"
    | Nop => {def=RegSet.empty, use=RegSet.empty}
    | J _ => {def=RegSet.empty, use=RegSet.empty}
+   | Leave => {def=list2set[reg "%esp"], use=list2set[reg "%ebp"]}
+   | Ret => {def=list2set[reg "%eip"], use=RegSet.empty}
+   | Push(r) => {def=RegSet.empty, use=list2set[r]}
+   | Pop(r) => {def=list2set[r], use=RegSet.empty}
+   | Branch2(c, l) => {def=RegSet.empty, use=RegSet.empty}
 
   fun syscall_def_use (num: int) : def_use option =
     case num of
@@ -373,6 +410,11 @@ struct
    | Jalr(r1,r2,use,def) => Jalr(f r1, f r2, map f use, map f def)
    | Syscall => Syscall
    | Nop => Nop
+   | Leave => Leave
+   | Ret => Ret
+   | Push(r) => Push(f r)
+   | Pop(r) => Pop(f r)
+   | Branch2(c, l) => Branch2(c, l)
  end
 
 end
