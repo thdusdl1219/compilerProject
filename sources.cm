@@ -26,3 +26,4 @@ graph.sig graph.sml
 liveness.sml
 color.sig color.sml
 regalloc.sml
+loopopt.sml

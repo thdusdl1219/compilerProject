@@ -94,9 +94,9 @@ struct
               palette, spill, precolored, colorResult) table end
             | _ => let 
                     val colorResult = 
-                      (print("getalias : " ^ M.reg2name(reg)  ^ " " ^ M.reg2name
+                      ( (*print("getalias : " ^ M.reg2name(reg)  ^ " " ^ M.reg2name
                       (getalias table reg) ^ " " ^ M.reg2name (hd (RS.listItems
-                      okColor)) ^ "\n");
+                      okColor)) ^ "\n");*)
                       case RT.look(#alloc(colorResult), getalias table reg) of
                         SOME(creg) => if(RS.member(okColor, creg)) then {alloc = RT.enter(#alloc(colorResult),
                     reg, creg), spills = #spills(colorResult)} else
