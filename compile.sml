@@ -5,7 +5,7 @@ struct
 
   fun compile filename = 
     let
-	val _ = Mips.reset()
+	val _ = X86.reset()
 	val absyn = Parse.parse (filename, TextIO.openIn filename)
         val () = still_ok()
         val () = TypeCheck.tc absyn
@@ -14,7 +14,7 @@ struct
         (* val _ = FunPP.print_prog absyn *)
 	val (strBL, funCodeL) = Codegen.codegen absyn
 	val out' = TextIO.openOut (filename^".noregalloc.s")
-	val _ = Mips.printAssem(out', (strBL, funCodeL)) 
+	val _ = X86.printAssem(out', (strBL, funCodeL)) 
                 before TextIO.closeOut out'
          	handle e => (TextIO.closeOut out'; raise e)
 
@@ -25,7 +25,7 @@ struct
 	val out = TextIO.openOut (filename^".s") 
 
     in 
-	Mips.printAssem(out, (strBL, funCodeL')) before TextIO.closeOut out
+	X86.printAssem(out, (strBL, funCodeL')) before TextIO.closeOut out
 	handle e => (TextIO.closeOut out; raise e)
 
     end
