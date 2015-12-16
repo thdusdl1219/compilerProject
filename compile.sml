@@ -22,7 +22,10 @@ struct
          	handle e => (TextIO.closeOut out'; raise e)
 
         (* val igraph = Liveness.liveness (strBL, funCodeL) *)
-  
+
+
+  (*val funCodeL = funCodeL1*)
+
 	val funCodeL' = List.map RegAlloc.alloc funCodeL
 
 	val out = TextIO.openOut (filename^".s") 

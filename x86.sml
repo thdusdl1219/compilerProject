@@ -369,7 +369,7 @@ struct
    | Move(rd,rs) => {def=list2set[rd], use=list2set[rs]}
    | Branchz(_,r,_) => {def=RegSet.empty, use=list2set[r]}
    | Branch(_,r1,r2,_) => {def=RegSet.empty, use=list2set[r1,r2]}
-   | Jal(_) => {def=list2set[reg "%eip"], use=RegSet.empty}
+   | Jal(_) => {def=list2set[reg "%eip", reg "%eax"], use=RegSet.empty}
    | Jr(r,also) => {def=RegSet.empty, use=list2set(r::also)}
    | Jalr(r1,r2,use,def) => {def=list2set(r1 :: def), use=list2set(r2::use)}
    | Syscall => ErrorMsg.impossible "Syscall"

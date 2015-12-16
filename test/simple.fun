@@ -9,6 +9,7 @@ fun call(x:int):int = x
 fun reff(x:int):int = let r = ref 2 in !r + 3
 
 fun main(x:int):int =
+	printint(1+1);
 	printint(simple(3));
 	printint(#1 #2 tuple(4));
 	printint(proj(<1,2>));

@@ -1,7 +1,6 @@
 *.fun.stdout
 *.noregalloc.s
 *.s
-*.fun.out
 fun*/
 .cm/*
 .*.sml.swo

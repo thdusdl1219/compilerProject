@@ -1,24 +1,13 @@
-fun addsome(x:int):int = x+5
+fun apple (a:<int, int>) : <int, int> =
+  if((#0 a) = 1)
+  then  <#1 a,#0 a>
+  else
+    a
 
-fun add(x:<int,int>):int = #0 x + #1 x
+fun banana (b:<int, int>) : int =
+  (#1 b) * 4 + (#1 b)
 
-fun gt(t:<int,int>):int =
-	let a = #0 t in
-	let b = #1 t in
-	not (a<b & not a=b)
-
-fun main(argc:int):int =
-	let x = (5 + 3) * 7 in
-	let y = x + 7 in
-printint(
-				if gt(<x,0>) then
-		if not x = 7 then
-			addsome(add(<x,y>))
-		else
-			-1
-	else
-		if -2 then
-			0
-		else
-			1
-		);0
+fun main(argc: int): int =
+  let a = ref 1 in
+  let b = ref 10 in
+    printint(banana(apple(<!a, !b>))); !a

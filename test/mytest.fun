@@ -19,7 +19,9 @@ fun test(arg:<int, int, int ref>):<>=
 	let sum = #2 arg in
 	let cur = !sum in
 	if not result=expected then 
-		sum := cur + 1;<>
+		(printint(result);sum := cur + 1;<>)
+		else
+		(printint(result);<>)
 
 fun main(arg:int):int =
 	let failed = ref 0 in
