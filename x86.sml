@@ -10,15 +10,15 @@ struct
       fun f (i, s::rest) = if name=s then i else f (i+1, rest)
 	      | f (_, nil) = 
 	        (case (String.sub(name,0), Int.fromString( String.substring (name, 2, (String.size name - 2))))
-	          of (#"x", SOME i) => i + 8  (* 32 is register $x0 *)
+	          of (#"x", SOME i) => i + 9  (* 32 is register $x0 *)
 	            | _ => raise Subscript)
 	          handle Subscript => ErrorMsg.impossible ("illegal register name: "^name)
     in f (0, regnames)
     end
   
-  fun isvirtual r = (r > 7)
+  fun isvirtual r = (r > 8)
   fun reg2name r =
-    if isvirtual r then "$x" ^ Int.toString(r-8)
+    if isvirtual r then "$x" ^ Int.toString(r-9)
     else List.nth(regnames, r)
   fun regs2names rs =
     let fun f [] = [] | f [r] = [reg2name r] | f(r::rs) = reg2name r :: "," :: f rs
@@ -30,12 +30,12 @@ struct
   val comparereg = Int.compare
 
   fun incr x = (x:= !x +1)
-  val regCount = ref 8
+  val regCount = ref 9
 
   val registers = List.map  reg  regnames
 
   val callerSaved = map reg [ "%eax", "%ecx", "%edx" ]
-  val calleeSaved = map reg [ "%ebx", "%esi", "%edi" ]
+  val calleeSaved = map reg [ "%ebx", "%esi", "%edi", "%esp", "%ebp"]
 
   fun newReg () = !regCount before incr regCount
 
@@ -90,9 +90,9 @@ struct
     | Pop of reg
     | Branch2 of comparecode1 * lab
 
-  and aop1 = Mul | Div
+  and aop1 = Div
   and aop2 = Abs | Neg | Not
-  and aop3 = Add | And | Or | Sub | Xor | Seq | Slt
+  and aop3 = Add | And | Or | Sub | Xor | Mul
   and aopi = Addi | Andi | Ori | Xori
   and comparecode1 = Lt | Eq | Ne | Ge | Gt | Le 
 
@@ -101,7 +101,7 @@ struct
   type funcode = codeblock list   
   type program = stringblock list * funcode list
 
-  fun reset () = (regCount := 8; labCount := 0)
+  fun reset () = (regCount := 9; labCount := 0)
 
   fun data2string sL = 
        List.foldl (fn ((lab, str), s) 
@@ -127,9 +127,7 @@ struct
       case instr of
         Arith1 (op1, rd) => (
           case op1 of
-            Mul => 
-              "\t" ^ "mul" ^ "\t" ^ reg2name rd  ^ "\n"
-          | Div =>
+            Div =>
               "\t" ^ "div" ^ "\t" ^ reg2name rd ^ "\n") (* need change! *)
       | Arith2 (op2, rd, rs) => (
           case op2 of 
@@ -187,12 +185,19 @@ struct
 	              ^ (reg2name rs) ^ ", " ^ (reg2name rd)
 	              ^ "\t# " ^ reg2name rd ^ " := " ^ reg2name rs
 	              ^ "|" ^ reg2name rt ^ "\n"
-          | Sub => 
-              mov2string rs rd
-	            ^ "\t"^ "sub" ^"\t"
-	            ^ (reg2name rt) ^ ", " ^ (reg2name rd)
-	            ^ "\t# " ^ reg2name rd ^ " := " ^ reg2name rs
-	            ^ "-" ^ reg2name rt ^ "\n"
+          | Sub =>
+              if(rt = rd) then
+                "\t" ^ "neg" ^ "\t" ^ reg2name rd ^ "\n" 
+  	            ^ "\t"^ "add" ^"\t"
+	              ^ (reg2name rs) ^ ", " ^ (reg2name rd)
+	              ^ "\t# " ^ reg2name rd ^ " := " ^ reg2name rs
+	              ^ "-" ^ reg2name rt ^ "\n"
+              else
+                mov2string rs rd
+	              ^ "\t"^ "sub" ^"\t"
+	              ^ (reg2name rt) ^ ", " ^ (reg2name rd)
+	              ^ "\t# " ^ reg2name rd ^ " := " ^ reg2name rs
+	              ^ "-" ^ reg2name rt ^ "\n"
           | Xor =>
               if (rd = rs) then
 	              "\t" ^ "xor" ^"\t"
@@ -205,18 +210,18 @@ struct
 	              ^ (reg2name rs) ^ ", " ^ (reg2name rd)
 	              ^ "\t# " ^ reg2name rd ^ " := " ^ reg2name rs
 	              ^ "^" ^ reg2name rt ^ "\n" 
-          | Seq =>
-	          "\t" ^ "movl \t" ^ int2string 0 ^", "^ reg2name rd ^ "\n"
-            ^ "\t" ^ "cmp \t" ^ reg2name rt ^", "^ reg2name rs ^ "\n"
-            ^ "\t" ^ "cmove \t" ^ int2string 1 ^", "^ reg2name rd 
-	          ^ "\t# " ^ reg2name rd ^" := " ^ reg2name rs ^ "==" ^ reg2name rt
-	          ^ "\n"
-          | Slt =>
-            "\t" ^ "movl \t" ^ int2string (0) ^", "^ reg2name rd ^ "\n"
-            ^ "\t" ^ "cmp \t" ^ reg2name rt ^", "^ reg2name rs ^ "\n"
-            ^ "\t" ^ "cmovl \t" ^ int2string (1) ^", "^ reg2name rd 
-	          ^ "\t# " ^ reg2name rd ^" := " ^ reg2name rs ^ " < " ^ reg2name rt
-	          ^ "\n" )
+          | Mul =>
+              if (rd = rs) then
+	              "\t" ^ "imul" ^"\t"
+	              ^ (reg2name rt) ^ ", " ^ (reg2name rd)
+	              ^ "\t# " ^ reg2name rd ^ " := " ^ reg2name rd
+	              ^ "*" ^ reg2name rt ^ "\n"
+              else
+                mov2string rt rd
+	              ^ "\t" ^ "imul" ^"\t"
+	              ^ (reg2name rs) ^ ", " ^ (reg2name rd)
+	              ^ "\t# " ^ reg2name rd ^ " := " ^ reg2name rs
+	              ^ "*" ^ reg2name rt ^ "\n" )
 
       | Arithi (opi, rt, rs, immed) =>
           let val (opname, oper) =
@@ -268,7 +273,7 @@ struct
               | Le =>
                   "\t" ^ "jle \t" ^ lab2string lab ^ "\n"
           in
-            ("\t" ^ "cmp \t" ^ reg2name reg ^", "^ int2string 0 ^ "\n" ^
+            ("\t" ^ "cmp \t" ^ int2string 0 ^", "^ reg2name reg ^ "\n" ^
             jmpinst)
           end
       | Branch (cmp, reg1, reg2, lab) =>
@@ -288,7 +293,7 @@ struct
               | Le =>
                   "\t" ^ "jle \t" ^ lab2string lab ^ "\n"
           in
-            ("\t" ^ "cmp \t" ^ reg2name reg1 ^", "^ reg2name reg2 ^ "\n" ^
+            ("\t" ^ "cmp \t" ^ reg2name reg2 ^", "^ reg2name reg1 ^ "\n" ^
             jmpinst)
           end
       | J (lab) => "\t"^"jmp \t"  ^(lab2string lab)^"\t\t# goto "
@@ -303,10 +308,10 @@ struct
         ^ regs2names def ^") := "
 	      ^ (if reg2name reg1 = "%eip" then "" else ErrorMsg.impossible ("jalr reg1 != %eip")) 
         ^ "call " ^ reg2name reg2 ^"(" ^ regs2names use ^ ")\n"
-      | Syscall =>  "\t"^"int $0x80 \n"
-      | Nop => "nop\n"
-      | Leave => "leave\n"
-      | Ret => "ret\n"
+      | Syscall =>  "\t"^"int \t$0x80 \n"
+      | Nop => "\tnop\n"
+      | Leave => "\tleave\n"
+      | Ret => "\tret\n"
       | Push (reg) => "\t"^"push \t"^(reg2name reg) ^
 		    "\t# push " ^ reg2name reg ^ "\n"
       | Pop (reg) => "\t"^"pop \t"^(reg2name reg) ^
@@ -343,7 +348,7 @@ struct
 		    "" cL 
 
   fun printAssem ( os, (strblockL, funL))  =
-	  let val s = "\t.data \n"^(data2string strblockL)^"\t.globl main \n"^ (code2string (List.concat funL) )
+	  let val s = "\t.section\t.rodata \n"^(data2string strblockL)^"\t.text\n\t.globl main \n"^ (code2string (List.concat funL) )
 	  in
 	   TextIO.output(os, s)
 	  end
@@ -370,7 +375,7 @@ struct
    | Syscall => ErrorMsg.impossible "Syscall"
    | Nop => {def=RegSet.empty, use=RegSet.empty}
    | J _ => {def=RegSet.empty, use=RegSet.empty}
-   | Leave => {def=list2set[reg "%esp"], use=list2set[reg "%ebp"]}
+   | Leave => {def=list2set[reg "%esp", reg "%ebp"], use=list2set[reg "%ebp"]}
    | Ret => {def=list2set[reg "%eip"], use=RegSet.empty}
    | Push(r) => {def=RegSet.empty, use=list2set[r]}
    | Pop(r) => {def=list2set[r], use=RegSet.empty}
@@ -378,8 +383,9 @@ struct
 
   fun syscall_def_use (num: int) : def_use option =
     case num of
-      4 => SOME{def=RegSet.empty, use=list2set[reg "%eax", reg "%ebx", reg "%ecx", reg "%edx"]}
+      4 => SOME{def=list2set[reg "%eax"], use=list2set[reg "%eax", reg "%ebx", reg "%ecx", reg "%edx"]}
     | 45 => SOME{def=list2set[reg "%eax"], use=list2set[reg "%eax", reg "%ebx"]}
+    | 125 => SOME{def=list2set[reg "%eax"], use=list2set[reg "%eax", reg "%ebx", reg "%ecx", reg "%edx"]}
     | _ => NONE
 
  type allocation = reg RegTb.table

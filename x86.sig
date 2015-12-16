@@ -72,9 +72,9 @@ signature X86s = sig
     | Pop of reg
     | Branch2 of comparecode1 * lab
 
-  and aop1 = Mul | Div
+  and aop1 = Div
   and aop2 = Abs | Neg | Not
-  and aop3 = Add | And | Or | Sub | Xor| Seq | Slt
+  and aop3 = Add | And | Or | Sub | Xor | Mul
   and aopi = Addi | Andi | Ori | Xori
   and comparecode1 = Lt | Eq | Ne | Ge | Gt | Le 
 

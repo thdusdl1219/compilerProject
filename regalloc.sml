@@ -31,15 +31,15 @@ struct
        if(RS.member(spills, rd)) then
           (case List.find (fn (ind, reg) => reg = rd) (!spillL) of
                 SOME((ind, reg)) => 
-          [M.Sw(rs, (M.immed (ind * 4), M.reg "$sp"))]
+          [M.Sw(rs, (M.immed (ind * 4), M.reg "%esp"))]
               | NONE => 
           (index := !index + 1; spillL := ((!index, rd) :: !spillL); 
-          [M.Sw(rs, (M.immed (!index * 4), M.reg "$sp"))])) 
+          [M.Sw(rs, (M.immed (!index * 4), M.reg "%esp"))])) 
        else (
           if RS.member(spills, rs) then
             (case List.find (fn (ind, reg) => reg = rs) (!spillL) of
                   SOME((ind, reg)) =>  (
-                  [M.Lw(rd, (M.immed (ind * 4), M.reg "$sp"))])
+                  [M.Lw(rd, (M.immed (ind * 4), M.reg "%esp"))])
                 | NONE => ErrorMsg.impossible ( "register isn't in spillL : " ^
                    M.reg2name rs ^ " : " ^ M.reg2name rd)
               )  
@@ -281,7 +281,7 @@ struct
    fun make_end (instrL : M.funcode, index) =
      case instrL of
        (l, instrs)::[] => if (!index) = ~1 then [(l, instrs)] else [(l,
-       (M.Leave)::instrs)]
+       instrs)]
      | h::t => h :: make_end (t,index)
    fun make_first (insrL : M.instruction list) (first:M.instruction list) index =
      case insrL of
