@@ -266,7 +266,10 @@ struct
               val _ = check_alloc_palette(r, alloc, palette) 
               val _ = check_func_coloring(r, alloc, spills) 
             in () end
-       in Liveness.analyze {mention = mention_verify, interfere = interfere_verify} func end
+          val _ = Liveness.analyze {mention = mention_verify, interfere = interfere_verify} func 
+       in 
+          ()
+       end
 
  fun color ({interference = ig: IG.graph,
              moves: IG.graph,

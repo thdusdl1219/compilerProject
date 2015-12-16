@@ -2,7 +2,7 @@ signature LIVENESS = sig
   structure IG: GRAPH where S=X86.RegSet
   val analyze: {mention: X86.reg -> unit, 
 	        interfere: X86.reg -> X86.reg -> unit} ->
-               X86.funcode -> unit
+               X86.funcode -> (X86.RegSet.set Symbol.table)
   val interference_graph: X86.funcode -> IG.graph
   val printgraph: (string->unit) -> IG.graph -> unit
 end
@@ -108,7 +108,7 @@ structure Liveness : LIVENESS = struct
         if(#2(result)) 
           then (live_at := #1(result); loop (analyze_func {mention=mention, interfere=interfere} blocks (!live_at) flow_graph false))
         else 
-          ()
+          !live_at
     in 
       loop (analyze_func {mention=mention, interfere=interfere} blocks (!live_at) flow_graph false)
       (*

@@ -321,36 +321,91 @@ fun singleDefsInBody (body:BBSet.set):RS.set =
 			RS.difference(set, mset)
 		end
 	end
+fun addPreheaderToFunCode (h::t) header preheaderInsts =
+	let 
+		val (headerLab,_) = header
+		val (thisLab,_) = h
+	in
+		if (headerLab = thisLab)
+		then
+			(M.freshlab(), preheaderInsts)::(h::t)
+		else
+			h::(addPreheaderToFunCode t header preheaderInsts)
+	end
+	| addPreheaderToFunCode [] _ _ = []
 
 fun optimize (funCode:M.funcode) : M.funcode =
 	let 
-		fun optimizeLoop (header:M.codeblock, body:BBSet.set) =
+		fun optimizeLoop ((header:M.codeblock, body:BBSet.set), code:M.funcode) =
 			let
+				fun isInTheLoop (block:M.codeblock):bool =
+					BBSet.member(body, block)
+
+				fun removeInvariantInsts (invariants:RS.set) (block:M.codeblock):M.codeblock = 
+					let 
+						val (lab, thisInstrs) = block
+					in
+						if isInTheLoop( block )
+						then
+							(lab, List.filter (fn (inst:M.instruction) =>
+								let val defs = #def (M.instr_def_use inst) in
+									if RS.numItems (RS.intersection(invariants, defs)) > 0 then false else true end)
+								thisInstrs)
+						else
+							block
+					end
+				fun extractInvariantInsts (invariants:RS.set) (block:M.codeblock, instrs:M.instruction list)=
+					let 
+						val (lab, thisInstrs) = block
+					in
+						if isInTheLoop( block )
+						then
+							foldl (fn (inst,l) => 
+								let val defs = #def (M.instr_def_use inst) in
+									if RS.numItems (RS.intersection(invariants, defs)) > 0 
+									then
+										inst::l
+									else
+										l
+									end
+							 ) instrs thisInstrs
+						else
+							instrs
+					end
+
+				val (headerLab,_) = header
+				val SOME liveoutOfPreheader = Symbol.look( 
+					Liveness.analyze 
+					{mention=(fn (x:M.reg) => ()),interfere=(fn (x:M.reg) => ( fn (y:M.reg) => ()))} 
+					funCode,
+					 headerLab )
 				val defset = defsInBody (body)
 				val singledefs = singleDefsInBody (body)
 				val _ = print "invariants: "
-				val invariants = RS.intersection( invariantsInBody defset RS.empty (body), singledefs)
+				val invariants = RS.difference( 
+					RS.intersection( invariantsInBody defset RS.empty (body), singledefs), 
+					liveoutOfPreheader )
 				val _ = print_set invariants
-			in
-				(header,body)
-			end
 
-		fun optimizeLoops (h::t) = 
-			(optimizeLoop h)::(optimizeLoops t)
-			| optimizeLoops [] = []
+				val preheaderInsts = foldl (extractInvariantInsts invariants) [] code
+				val funCodeAfterRemoval = List.map (removeInvariantInsts invariants) code
+				val newFunCode = addPreheaderToFunCode funCodeAfterRemoval header preheaderInsts
+			in
+				newFunCode
+			end
 
 		val g = CFG.newGraph()
 		val _ = makeCFG g funCode
 		val domMap = makeDomMap g (hd(funCode))
 		val loops = findLoops g domMap
 
-		val _ = optimizeLoops loops
+		(*val _ = optimizeLoops loops*)
 		(*val _ = print ("###### DomMap\n")
 		val _ = dumpDomMap domMap*)
 	in
 		(*printgraph print g;
 		print ("###### END \n");*)
-		funCode
+		foldl optimizeLoop funCode loops
 	end
 
 end

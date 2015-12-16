@@ -15,14 +15,14 @@ struct
 	val (strBL, funCodeL1) = Codegen.codegen absyn
 	val out' = TextIO.openOut (filename^".noregalloc.s")
 
-
-	val _ = X86.printAssem(out', (strBL, funCodeL1)) 
+  val funCodeL = List.map LoopOpt.optimize funCodeL1
+	val _ = X86.printAssem(out', (strBL, funCodeL)) 
 
                 before TextIO.closeOut out'
          	handle e => (TextIO.closeOut out'; raise e)
 
         (* val igraph = Liveness.liveness (strBL, funCodeL) *)
-  val funCodeL = List.map LoopOpt.optimize funCodeL1
+  
 	val funCodeL' = List.map RegAlloc.alloc funCodeL
 
 	val out = TextIO.openOut (filename^".s") 
