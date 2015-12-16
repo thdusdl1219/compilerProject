@@ -376,7 +376,7 @@ struct
    | Nop => {def=RegSet.empty, use=RegSet.empty}
    | J _ => {def=RegSet.empty, use=RegSet.empty}
    | Leave => {def=list2set[reg "%esp", reg "%ebp"], use=list2set[reg "%ebp"]}
-   | Ret => {def=list2set[reg "%eip"], use=RegSet.empty}
+   | Ret => {def=RegSet.empty, use=list2set(reg "%eax"::calleeSaved)}
    | Push(r) => {def=RegSet.empty, use=list2set[r]}
    | Pop(r) => {def=list2set[r], use=RegSet.empty}
    | Branch2(c, l) => {def=RegSet.empty, use=RegSet.empty}

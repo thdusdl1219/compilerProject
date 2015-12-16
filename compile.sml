@@ -23,10 +23,8 @@ struct
 
         (* val igraph = Liveness.liveness (strBL, funCodeL) *)
 
-
-  (*val funCodeL = funCodeL1*)
-
 	val funCodeL' = List.map RegAlloc.alloc funCodeL
+  val funCodeL' = List.map Deadcode.deadcode_elimination funCodeL'
 
 	val out = TextIO.openOut (filename^".s") 
 
