@@ -117,10 +117,10 @@ struct
         if x < 0 then "-" ^ (Int.toString(~x))
         else (Int.toString x)
       fun mov2string rs rd = 
-        if(rs = rd) then
-          ""
+       ( if(rs = rd) then
+          "\t\t\t"
         else
-          "\t" ^ "movl" ^ "\t" ^ reg2name rs ^ ", " ^ reg2name rd ^
+          "\t" ^ "movl" ^ "\t" ^ reg2name rs ^ ", " ^ reg2name rd ) ^
           "\t#" ^ reg2name rd ^ " := " ^ reg2name rs ^ "\n"
 
     in
