@@ -20,7 +20,9 @@ parse.sml
 typecheck.sml
 compile.sml
 
+
 mips.sig mips.sml
+x86.sig x86.sml
 codegen.sml
 graph.sig graph.sml
 liveness.sml

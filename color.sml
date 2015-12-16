@@ -2,7 +2,7 @@ structure Color : COLOR =
 struct
 
  structure IG = Liveness.IG
- structure M = Mips
+ structure M = X86
  structure RS = M.RegSet
  structure RT = M.RegTb
 
@@ -73,7 +73,7 @@ struct
    case stack of
       reg::tail => 
         let
-   (*       val _ = (print("stack : " ); print_list stack) *)
+          val _ = (print("stack : " ); print_list stack) 
           val adjSet = IG.adj ig reg ; 
           val tmpReg = M.newReg (); 
           val colorSet =
@@ -94,7 +94,8 @@ struct
               palette, spill, precolored, colorResult) table end
             | _ => let 
                     val colorResult = 
-                      ( (*print("getalias : " ^ M.reg2name(reg)  ^ " " ^ M.reg2name
+                      ((*( print("getalias : " ^ M.reg2name(reg)  ^ " " ^ M.reg2name                      
+                    (print("getalias : " ^ M.reg2name(reg)  ^ " " ^ M.reg2name
                       (getalias table reg) ^ " " ^ M.reg2name (hd (RS.listItems
                       okColor)) ^ "\n");*)
                       case RT.look(#alloc(colorResult), getalias table reg) of

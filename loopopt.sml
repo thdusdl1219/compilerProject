@@ -1,10 +1,10 @@
 signature LOOPOPT = 
 sig
-	val optimize: Mips.funcode -> Mips.funcode
+	val optimize: X86.funcode -> X86.funcode
 end
 
 structure LoopOpt : LOOPOPT = struct
-	structure M = Mips
+	structure M = X86
 
 fun compareBlock (x,y) = 
 	let val (lab1,insts1) = x

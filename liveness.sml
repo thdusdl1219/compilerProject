@@ -1,17 +1,17 @@
 signature LIVENESS = sig
-  structure IG: GRAPH where S=Mips.RegSet
-  val analyze: {mention: Mips.reg -> unit, 
-	        interfere: Mips.reg -> Mips.reg -> unit} ->
-               Mips.funcode -> unit
-  val interference_graph: Mips.funcode -> IG.graph
+  structure IG: GRAPH where S=X86.RegSet
+  val analyze: {mention: X86.reg -> unit, 
+	        interfere: X86.reg -> X86.reg -> unit} ->
+               X86.funcode -> unit
+  val interference_graph: X86.funcode -> IG.graph
   val printgraph: (string->unit) -> IG.graph -> unit
 end
 
    (* ErrorMsg.impossible "Liveness.analyze unimplemented" *)
 structure Liveness : LIVENESS = struct
-  structure IG = Graph(Mips.RegSet)
-  structure M = Mips
-  structure RS = Mips.RegSet
+  structure IG = Graph(X86.RegSet)
+  structure M = X86
+  structure RS = X86.RegSet
   structure FS = RedBlackSetFn(type ord_key = M.lab val compare = Symbol.compare)
   structure FG = Graph(FS)
 
@@ -27,27 +27,23 @@ structure Liveness : LIVENESS = struct
 
  fun compute_live_in(M.Li(r, i)::M.Syscall::rest, live_at_end) {mention : M.reg -> unit, interfere : M.reg -> M.reg -> unit} (live_at : RS.set Symbol.table) (flow_graph : FG.graph) : RS.set =
  let val live_out = compute_live_in(rest, live_at_end) {mention=mention, interfere=interfere} live_at flow_graph; val def_use_Li = M.instr_def_use(M.Li(r,i)) in
-   if (r = M.reg "$v0") then
+   if (r = M.reg "%eax") then
      (case M.syscall_def_use (M.immed2int i) of
           SOME def_use => (make_mention mention (#use(def_use)); make_mention mention (#def(def_use)); make_mention mention (#def(def_use_Li)); make_interfere interfere (#def(def_use_Li)) (RS.union(#use(def_use), RS.difference(live_out, #def(def_use)))); RS.union(#use(def_use), RS.difference(live_out, RS.union(#def(def_use_Li),#def(def_use)))))
         | NONE => ErrorMsg.impossible "Unknown Syscall")
-    else ErrorMsg.impossible "Syscall not preceded by li $v0" 
+    else ErrorMsg.impossible "Syscall not preceded by li %eax" 
  end
 
  | compute_live_in(i::rest, live_at_end) {mention : M.reg -> unit, interfere : M.reg -> M.reg -> unit} (live_at : RS.set Symbol.table) (flow_graph : FG.graph) : RS.set = (* ErrorMsg.impossible "Liveness.analyze unimplemented" *)
   let 
     val live_out = compute_live_in(rest, live_at_end) {mention=mention, interfere=interfere} live_at flow_graph; 
-    val def_use = M.instr_def_use(i) 
- in 
+    val def_use = M.instr_def_use(i) in 
    make_mention mention (#use(def_use)); make_mention mention (#def(def_use)); make_interfere interfere (#def(def_use)) live_out;
     (case i of
       M.Branchz(_,_,lab) => (case Symbol.look(live_at, lab) of 
                                   SOME set => RS.union(#use(def_use), RS.difference(RS.union(set,live_out), #def(def_use)))
                                 | NONE => RS.union(#use(def_use), RS.difference(RS.union(RS.empty,live_out), #def(def_use)))) 
 
-    | M.Branchu(_,_,_,lab) => (case Symbol.look(live_at, lab) of
-                                    SOME set => RS.union(#use(def_use), RS.difference(RS.union(set,live_out), #def(def_use)))
-                                  | NONE => RS.union(#use(def_use), RS.difference(RS.union(RS.empty,live_out), #def(def_use)))) 
 
     | M.Branch(_,_,_,lab) => (case Symbol.look(live_at, lab) of 
                                    SOME set => RS.union(#use(def_use), RS.difference(RS.union(set,live_out), #def(def_use)))
@@ -55,10 +51,10 @@ structure Liveness : LIVENESS = struct
     | M.J(lab) => (case Symbol.look(live_at, lab) of
                         SOME set => RS.union(#use(def_use), RS.difference(set, #def(def_use)))
                       | NONE => RS.union(#use(def_use), RS.difference(RS.empty, #def(def_use)))) 
-    | M.Jal(lab) =>  ( let val def_use = {use=RS.union(M.list2set([M.reg "$v0"]), #use(def_use)), def= RS.union(M.list2set(M.reg "$a0"::M.callerSaved), #def(def_use)) } in ( make_mention mention (#def(def_use)); make_mention mention (#use(def_use)); make_interfere interfere (#def(def_use)) live_out;
+    | M.Jal(lab) =>  ( let val def_use = {use= RS.union(M.list2set([M.reg "%eax"]), #use(def_use)), def= RS.union(M.list2set(M.callerSaved), #def(def_use)) } in ( make_mention mention (#def(def_use)); make_mention mention (#use(def_use)); make_interfere interfere (#def(def_use)) live_out;
         (case Symbol.look(live_at, lab) of
-                          SOME set => (RS.union(#use(def_use), RS.difference(RS.union(set,live_out), #def(def_use))))
-                        | NONE => RS.union(#use(def_use), RS.difference(live_out, #def(def_use))))) end ) 
+                          SOME set => ((RS.union(#use(def_use), RS.difference(RS.union(set,live_out), #def(def_use)))))
+                        | NONE => (RS.union(#use(def_use), RS.difference(live_out, #def(def_use)))))) end ) 
 
     | _ => RS.union(#use(def_use), RS.difference(live_out, #def(def_use)))) end
  | compute_live_in(nil, live_at_end) {mention : M.reg -> unit, interfere : M.reg -> M.reg -> unit} (live_at : RS.set Symbol.table) (flow_graph : FG.graph) : RS.set = live_at_end
@@ -91,7 +87,7 @@ structure Liveness : LIVENESS = struct
       | [] => (live_at, changed )
       )
 
- fun printli say l (i:(Symbol.symbol * Mips.RegSet.set)) =
+ fun printli say l (i:(Symbol.symbol * M.RegSet.set)) =
    (say (Symbol.name(#1(i))); say ":";
     IG.S.app (fn j => (say " "; say (M.reg2name j))) (#2(i));
     say "\n")

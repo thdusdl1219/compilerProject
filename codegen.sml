@@ -1,12 +1,12 @@
 signature CODEGEN = sig
-  val codegen : Absyn.prog -> Mips.program
+  val codegen : Absyn.prog -> X86.program
 end
 
 structure Codegen :> CODEGEN = 
   struct
 
     structure A = Absyn
-    structure M = Mips
+    structure M = X86
     structure E = ErrorMsg
 
   local
@@ -53,7 +53,8 @@ structure Codegen :> CODEGEN =
     fun emit_label l = (finish_block(); last_lab := SOME l)
   end
 
-    val newline_lab = M.thislab "NL"
+    val newline_lab = M.thislab "NL"    
+    val intprint_lab = M.thislab "IP"
 
     (* Memory management functions. *) 
 
@@ -64,45 +65,60 @@ structure Codegen :> CODEGEN =
     (* Emits a call to alloc, to allocate 'size' bytes, and put the 
      * returned address in 'ret_reg'. *) 
     fun emit_alloc_call (size:M.immed, ret_reg:M.reg) = 
-      (emit (M.Li(M.reg("$a0"), size));
-       emit (M.Jal(alloc_lab));
-       emit (M.Move(ret_reg, M.reg("$v0"))))
+      let val arg_tmp = M.newReg()
+      in
+        (
+         emit (M.Li(arg_tmp, size));
+         emit (M.Push(arg_tmp));
+         emit (M.Jal(alloc_lab));
+         emit (M.Pop(arg_tmp));
+         emit (M.Move(ret_reg, M.reg("%eax")))
+         )
+      end
           
-    fun emit_alloc_func () = 
+    fun emit_alloc_func () =
+      let val eax_temp = M.newReg(); val li_temp = M.newReg(); val ebx_temp = M.newReg(); val ecx_temp = M.newReg() ; val edx_temp = M.newReg()
+      in
       (emit_label alloc_lab;
-       emit (M.Lw(M.reg "$v0", (M.immed 0, M.reg "$gp")));
-       emit (M.Arith3(M.Add, M.reg "$t0",M.reg "$v0", M.reg("$a0")));
-       emit (M.Sw(M.reg "$t0", (M.immed 0, M.reg "$gp")));
-       emit_label (M.thislab "alloc.epilog");
-       emit (M.Jr(M.reg("$ra"), M.reg "$v0" :: M.calleeSaved));
+       emit (M.Push(M.reg("%ebp")));
+       emit (M.Move(M.reg("%ebp"), M.reg("%esp")));
+       emit (M.Arithi(M.Addi, M.reg("%esp"), M.reg("%esp"), M.immed (~4)));
+       emit (M.Lw(M.reg("%eax"), (M.immed 8, M.reg("%ebp"))));
+       emit (M.Sw(M.reg("%eax"), (M.immed 0, M.reg("%esp"))));
+       emit (M.Jal(M.thislab "malloc"));
+       emit_label (M.thislab "alloc.epilog"); 
+       emit (M.Leave);
+       emit (M.Ret);
        finish_fun())
-
-    fun emit_init_func () = 
-     let val ra_tmp = M.newReg()
-      in emit_label (M.thislab "main");
-         emit (M.Move(ra_tmp, M.reg "$ra"));
-         emit (M.Li(M.reg("$a0"), M.immed(heap_size)));
-         emit (M.Li(M.reg("$v0"), M.immed(9)));
-         emit (M.Syscall);
-         emit (M.Sw(M.reg "$v0", (M.immed 0, M.reg "$gp")));
-         emit (M.Jal(M.thislab "_main"));
-         emit (M.Move(M.reg "$ra", ra_tmp));
-         emit_label (M.thislab "main.epilog");
-         emit (M.Jr(M.reg("$ra"), M.reg "$v0" :: M.calleeSaved));
-         finish_fun()
       end
 
+    fun emit_init_func () = 
+        (emit_label (M.thislab "main");
+(*         emit (M.Push(M.reg("%ebp")));
+         emit (M.Move(M.reg("%ebp", "%esp"))); *)
+         emit (M.Jal(M.thislab "_main"));
+         emit_label (M.thislab "main.epilog");
+         emit (M.Ret);
+         finish_fun())
+
     fun emit_printint_func() =
+      let val done_lab = M.freshlab()
+      in
       (emit_label (M.thislab "_printint");
-       emit (M.Li(M.reg("$v0"), M.immed(1)));
-       emit (M.Syscall);
+       emit (M.Push(M.reg("%ebp")));
+       emit (M.Move(M.reg("%ebp"), M.reg("%esp")));
+       emit (M.Arithi(M.Addi, M.reg("%esp"), M.reg("%esp"), M.immed (~8)));
+       emit (M.Lw(M.reg("%eax"), (M.immed 8, M.reg("%ebp"))));
+       emit (M.Sw(M.reg("%eax"), (M.immed 4, M.reg("%esp"))));
+       emit (M.La(M.reg("%eax"), intprint_lab));
+       emit (M.Sw(M.reg("%eax"), (M.immed 0, M.reg("%esp"))));
+       emit (M.Jal(M.thislab "printf"));
        (* Print a newline after the integer, for clarity. *)
-       emit (M.La(M.reg("$a0"), newline_lab));
-       emit (M.Li(M.reg("$v0"), M.immed(4)));
-       emit (M.Syscall);
        emit_label (M.thislab "_printint.epilog");
-       emit (M.Jr(M.reg("$ra"),M.reg "$v0" :: M.calleeSaved));
+       emit (M.Leave);
+       emit (M.Ret);
        finish_fun())
+      end
 
     datatype value = Reg of M.reg | Lab of M.lab
 
@@ -117,9 +133,7 @@ structure Codegen :> CODEGEN =
 
     fun fun2mips_arith_op A.Add = M.Add
       | fun2mips_arith_op A.Sub = M.Sub
-      | fun2mips_arith_op A.Mul = M.Mulo
-      | fun2mips_arith_op A.LT  = M.Slt
-      | fun2mips_arith_op A.Eq  = M.Seq
+      | fun2mips_arith_op A.Mul = M.Mul
       | fun2mips_arith_op _      = E.impossible "Arith op expected"
 
     (* Remove Pos and Constrain, to simplify pattern matching. *)
@@ -200,17 +214,32 @@ structure Codegen :> CODEGEN =
                   end
               | A.Mul => 
                   let val mop = fun2mips_arith_op(oper); val r = M.newReg(); val r1 = gen_exp env (List.nth(expl, 0)); val r2 = gen_exp env (List.nth(expl, 1)); 
-                    in emit(M.Arith3(mop,r,r1,r2));
+                    in
+                      emit(M.Arith3(mop,r,r1,r2));
                       r
                     end
               | A.LT => 
-                  let val mop = fun2mips_arith_op(oper); val r = M.newReg(); val r1 = gen_exp env (List.nth(expl, 0)); val r2 = gen_exp env (List.nth(expl, 1)); 
-                    in emit(M.Arith3(mop,r,r1,r2));
+                  let val r = M.newReg(); val r1 = gen_exp env (List.nth(expl, 0)); val r2 = gen_exp env (List.nth(expl, 1)); val else_lab = M.freshlab(); val done_lab = M.freshlab()
+                    in
+                      emit(M.Branch(M.Lt, r1, r2, else_lab)); 
+                      emit(M.Li(r, M.immed(0)));
+                      emit(M.J(done_lab));
+                      emit_label(else_lab);
+                      emit(M.Li(r, M.immed(1)));
+                      emit_label(done_lab);
                       r
                     end
               | A.Eq => 
-                  let val mop = fun2mips_arith_op(oper); val r = M.newReg(); val r1 = gen_exp env (List.nth(expl, 0)) 
-                    in (emit(M.Arith3(mop,r,r1,gen_exp env (List.nth(expl, 1)))); r) end
+                  let val r = M.newReg(); val r1 = gen_exp env (List.nth(expl, 0)) ; val else_lab = M.freshlab(); val r2 = gen_exp env (List.nth(expl, 1)); val done_lab = M.freshlab()
+                    in 
+                      emit(M.Branch(M.Eq, r1, r2, else_lab)); 
+                      emit(M.Li(r, M.immed(0)));
+                      emit(M.J(done_lab));
+                      emit_label(else_lab);
+                      emit(M.Li(r, M.immed(1)));
+                      emit_label(done_lab);
+                      r
+                    end
           )
         | gen (A.Tuple expl) = 
           let val r = M.newReg() 
@@ -225,9 +254,13 @@ structure Codegen :> CODEGEN =
           let val else_lab = M.freshlab (); val r = M.newReg(); val done_lab = M.freshlab ()
           in (
             case (exp2, exp3) of
-                 (A.Int(0), A.Int(1)) => 
-                  (emit(M.Arith3(M.Seq, r, gen_exp env exp1, M.reg "$zero")); r)
-               | (A.Int(1), A.Int(0)) => (emit(M.Move(r, gen_exp env exp1)); r)
+                (* (A.Int(0), A.Int(1)) =>
+                  let val zeroR = M.newReg ()
+                  in
+                    (emit(M.Li(zeroR, M.immed 0));
+                     emit(M.Arith3(M.Seq, r, gen_exp env exp1, zeroR)); r)
+                  end *)
+                 (A.Int(1), A.Int(0)) => (emit(M.Move(r, gen_exp env exp1)); r)
         (*       | (A.If(if_exp1, A.Int(1), A.Int(0)), A.Int(0)) =>
                   
                | (A.Int(1), A.If(exp2, A.Int(1), A.Int(0))) => *)
@@ -239,9 +272,27 @@ structure Codegen :> CODEGEN =
           let val check_lab = M.freshlab (); val done_lab = M.freshlab (); val r = M.newReg() 
             in emit_label(check_lab); emit(M.Branchz(M.Eq, gen_exp env exp1, done_lab));
             emit(M.Move(r, gen_exp env exp2)); emit(M.J(check_lab)); emit_label(done_lab); r end (* I don't know what is return... *)
+        | gen (A.Call(A.Id fid, exp2)) =
+            let val res_tmp = M.newReg(); val arg_tmp = M.newReg()
+            in
+              emit(M.Move(arg_tmp, gen_exp env exp2));
+              emit(M.Push(arg_tmp));
+              (case Symbol.look (env, fid) of
+                 SOME (Reg r) =>
+                  (emit (M.Jalr(M.reg ("%eip"), r, M.reg "%eax" :: ((M.reg "%eip") :: M.callerSaved), [])))
+               | SOME (Lab lab) =>
+                  emit (M.Jal lab)
+               | NONE => E.impossible("Can't find " ^ Symbol.name fid);
+               emit(M.Pop(arg_tmp));
+               emit(M.Move(res_tmp, M.reg("%eax")));
+               res_tmp)
+            end
+
         | gen (A.Call(exp1, exp2)) = 
-          let val r1 = gen_exp env exp1; val r2 = gen_exp env exp2; val r = M.newReg() in
-            emit(M.Move(M.reg "$a0", r2)); emit(M.Jalr(M.reg "$ra", r1, M.reg "$v0" ::((M.reg "$ra") ::M.callerSaved), [M.reg "$a0"])); emit(M.Move(r, M.reg "$v0")); r end (* jalr 잘 모르겠당. *) 
+          let val r1 = M.newReg(); val r2 = M.newReg(); val r3 = M.newReg(); val r = M.newReg() in
+            emit(M.Move(r1, gen_exp env exp1)); emit(M.Move(r2, gen_exp env exp2)); emit(M.Move(r3, r1));
+            emit(M.Push(r2)); emit(M.Jalr(M.reg "%eip", r3, M.reg "%eax" ::((M.reg "%eip") ::M.callerSaved), [])); 
+            emit(M.Pop(r2)); emit(M.Move(r, M.reg "%eax")); r end (* jalr 잘 모르겠당. *) 
         | gen (A.Let(id1, exp1, exp2)) = 
           let val env = Symbol.enter(env, id1, Reg(gen_exp env exp1)) in gen_exp env
           exp2 end
@@ -258,31 +309,22 @@ structure Codegen :> CODEGEN =
 
     fun gen_func (fenv, (f,x,t1,t2,exp)) = 
           (  (* IMPLEMENT ME! *)
-           let val ra_tmp = M.newReg(); val s0_tmp = M.newReg(); val s1_tmp = M.newReg(); val s2_tmp = M.newReg(); val s3_tmp = M.newReg(); val s4_tmp = M.newReg(); val s5_tmp = M.newReg(); val s6_tmp = M.newReg(); val s7_tmp = M.newReg(); val a0_tmp = M.newReg(); val fenv = Symbol.enter(fenv, x, Reg(a0_tmp))
+           let val ebx_tmp = M.newReg(); val esi_tmp = M.newReg(); val edi_tmp = M.newReg(); val a0_tmp = M.newReg(); val fenv = Symbol.enter(fenv, x, Reg(a0_tmp))
             in 
            emit_label (fun_label f);
-           emit (M.Move(ra_tmp, M.reg "$ra"));
-           emit (M.Move(s0_tmp, M.reg "$s0"));
-           emit (M.Move(s1_tmp, M.reg "$s1"));
-           emit (M.Move(s2_tmp, M.reg "$s2"));
-           emit (M.Move(s3_tmp, M.reg "$s3"));
-           emit (M.Move(s4_tmp, M.reg "$s4"));
-           emit (M.Move(s5_tmp, M.reg "$s5"));
-           emit (M.Move(s6_tmp, M.reg "$s6"));
-           emit (M.Move(s7_tmp, M.reg "$s7"));
-           emit (M.Move(a0_tmp, M.reg "$a0")); 
-           emit (M.Move(M.reg "$v0", gen_exp fenv (strip exp)));
-           emit (M.Move(M.reg "$ra", ra_tmp));
-           emit (M.Move(M.reg "$s0", s0_tmp));
-           emit (M.Move(M.reg "$s1", s1_tmp));
-           emit (M.Move(M.reg "$s2", s2_tmp));
-           emit (M.Move(M.reg "$s3", s3_tmp));
-           emit (M.Move(M.reg "$s4", s4_tmp));
-           emit (M.Move(M.reg "$s5", s5_tmp));
-           emit (M.Move(M.reg "$s6", s6_tmp));
-           emit (M.Move(M.reg "$s7", s7_tmp)); 
+           emit (M.Push(M.reg("%ebp")));
+           emit (M.Move(M.reg("%ebp"), M.reg("%esp")));
+           emit (M.Move(ebx_tmp, M.reg "%ebx"));
+           emit (M.Move(esi_tmp, M.reg "%esi"));
+           emit (M.Move(edi_tmp, M.reg "%edi"));
+           emit (M.Lw(a0_tmp, (M.immed 8, M.reg "%ebp"))); 
+           emit (M.Move(M.reg "%eax", gen_exp fenv (strip exp)));
+           emit (M.Move(M.reg "%ebx", ebx_tmp));
+           emit (M.Move(M.reg "%esi", esi_tmp));
+           emit (M.Move(M.reg "%edi", edi_tmp)); 
            emit_label (Symbol.symbol(Symbol.name (fun_label f) ^ ".epilog"));
-           emit (M.Jr(M.reg("$ra"),M.reg "$v0" :: M.calleeSaved));
+           emit (M.Leave);
+           emit (M.Ret);
            finish_fun ()
             end
           )
@@ -305,6 +347,6 @@ structure Codegen :> CODEGEN =
          emit_alloc_func();
          emit_printint_func();
          List.app (fn (_,fd) => gen_func (fenv, fd)) fundec_list;          
-         ([(newline_lab,"\\n")], finish_prog())
+         ([(newline_lab,"\\n"), (intprint_lab, "%d\\n")], finish_prog())
       end
   end
