@@ -29,6 +29,7 @@ signature X86s = sig
   val immed2int : immed -> int (* convert an immediate to an int*)
   val compareimmed : (immed * immed) -> order (*compare two immediates*)
 
+
   val wordSize : int 
   val wordSizeImmed : immed
 
@@ -85,6 +86,7 @@ signature X86s = sig
 
 (*print a mips program to an output stream*)
   val printAssem: (TextIO.outstream * program) -> unit
+  val instr2string: instruction -> string
 
   type def_use = {def: RegSet.set, use: RegSet.set}
   val list2set : reg list -> RegSet.set

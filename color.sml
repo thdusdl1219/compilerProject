@@ -73,7 +73,7 @@ struct
    case stack of
       reg::tail => 
         let
-          val _ = (print("stack : " ); print_list stack) 
+          (*val _ = (print("stack : " ); print_list stack) *)
           val adjSet = IG.adj ig reg ; 
           val tmpReg = M.newReg (); 
           val colorSet =

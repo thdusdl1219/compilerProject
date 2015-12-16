@@ -222,6 +222,7 @@ structure Codegen :> CODEGEN =
                   let val r = M.newReg(); val r1 = gen_exp env (List.nth(expl, 0)); val r2 = gen_exp env (List.nth(expl, 1)); val else_lab = M.freshlab(); val done_lab = M.freshlab()
                     in
                       emit(M.Branch(M.Lt, r1, r2, else_lab)); 
+                      emit_label(M.freshlab());
                       emit(M.Li(r, M.immed(0)));
                       emit(M.J(done_lab));
                       emit_label(else_lab);
@@ -232,7 +233,8 @@ structure Codegen :> CODEGEN =
               | A.Eq => 
                   let val r = M.newReg(); val r1 = gen_exp env (List.nth(expl, 0)) ; val else_lab = M.freshlab(); val r2 = gen_exp env (List.nth(expl, 1)); val done_lab = M.freshlab()
                     in 
-                      emit(M.Branch(M.Eq, r1, r2, else_lab)); 
+                      emit(M.Branch(M.Eq, r1, r2, else_lab));
+                      emit_label(M.freshlab());
                       emit(M.Li(r, M.immed(0)));
                       emit(M.J(done_lab));
                       emit_label(else_lab);
@@ -265,12 +267,15 @@ structure Codegen :> CODEGEN =
                   
                | (A.Int(1), A.If(exp2, A.Int(1), A.Int(0))) => *)
                | _ =>
-                  (emit(M.Branchz(M.Eq, gen_exp env exp1, else_lab)); emit(M.Move(r, gen_exp env exp2)) ; emit(M.J(done_lab)); emit_label (else_lab) ; emit(M.Move(r, gen_exp env exp3)) ; emit_label (done_lab); r)
+                  (emit(M.Branchz(M.Eq, gen_exp env exp1, else_lab)); 
+                      emit_label(M.freshlab());
+
+                  emit(M.Move(r, gen_exp env exp2)) ; emit(M.J(done_lab)); emit_label (else_lab) ; emit(M.Move(r, gen_exp env exp3)) ; emit_label (done_lab); r)
             ) 
           end
         | gen (A.While(exp1, exp2)) = 
           let val check_lab = M.freshlab (); val done_lab = M.freshlab (); val r = M.newReg() 
-            in emit_label(check_lab); emit(M.Branchz(M.Eq, gen_exp env exp1, done_lab));
+            in emit_label(check_lab); emit(M.Branchz(M.Eq, gen_exp env exp1, done_lab));emit_label(M.freshlab());
             emit(M.Move(r, gen_exp env exp2)); emit(M.J(check_lab)); emit_label(done_lab); r end (* I don't know what is return... *)
         | gen (A.Call(A.Id fid, exp2)) =
             let val res_tmp = M.newReg(); val arg_tmp = M.newReg()
