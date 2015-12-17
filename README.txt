@@ -1,7 +1,7 @@
 COMPILER PROJECT 
 
 author: Soyeon Park, Dayeol Lee
-기본 골격은 Soyen Park의 코드를 사용하였음!
+기본 골격은 Soyeon Park의 코드를 사용하였음!
 
 1. Summary
  
@@ -29,7 +29,9 @@ author: Soyeon Park, Dayeol Lee
 	(3) 기본적으로 지원하는 함수들의 구현(alloc, printint)
 	처음에는 sys_write와 sys_brk system call을 이용하여 구현하려고 하였다. 
 	하지만 sys_write는 int 출력을 위한 함수가 아니여서 많은 어려움이 있었고
-	두 system call 모두 많은 register를 사용하여서 많은 register의 저장과 복구가 요구되었다.
+  sys_brk를 사용하여 구현하려면 sys_mprotect도 실행해 줘야해서 매우 복잡한 assembly 코딩이 요구되었다..ㅠㅠ
+  (brk로 heap 할당만 하고 mprotect로 write|read 권한을 주지 않으면 segmentation fault가 난다..)
+	또한 두 system call 모두 많은 register를 사용하여서 많은 register의 저장과 복구가 요구되었다.
 	그래서 library 함수인 malloc과 printf를 이용하여 alloc과 printint를 구현하였다.
 
 	(4) mips와 x86의 instruction간의 1대1 매칭이 안됨
@@ -37,7 +39,7 @@ author: Soyeon Park, Dayeol Lee
 	이를 해결하기 위해 x86 instruction을 이용하여 구현하였다..
 	(x86.sml 참고..)
 
-	(4) 기존의 파일들을 이용하기 위해서..
+	(5) 기존의 파일들을 이용하기 위해서..
 	mips instruction들을 x86 instruction을 이용하여 구현할때 use, def를 지키면서 
 	sourse register들을 오염하지 않도록 구현해야했다. 
 	assembly로 코딩하던 시절의 프로그래머들의 힘듬을 알 것 같다. 컴파일러 만든 사람 짱짱맨
