@@ -15,8 +15,8 @@ struct
 	val (strBL, funCodeL1) = Codegen.codegen absyn
 	val out' = TextIO.openOut (filename^".noregalloc.s")
 
-  (*val funCodeL = List.map LoopOpt.optimize funCodeL1*)
-  val funCodeL = funCodeL1
+  val funCodeL = List.map LoopOpt.optimize funCodeL1
+  (*val funCodeL = funCodeL1*)
 	val _ = X86.printAssem(out', (strBL, funCodeL)) 
 
                 before TextIO.closeOut out'
