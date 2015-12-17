@@ -117,10 +117,10 @@ struct
         if x < 0 then "-" ^ (Int.toString(~x))
         else (Int.toString x)
       fun mov2string rs rd = 
-        if(rs = rd) then
-          ""
+       ( if(rs = rd) then
+          "\t\t\t"
         else
-          "\t" ^ "movl" ^ "\t" ^ reg2name rs ^ ", " ^ reg2name rd ^
+          "\t" ^ "movl" ^ "\t" ^ reg2name rs ^ ", " ^ reg2name rd ) ^
           "\t#" ^ reg2name rd ^ " := " ^ reg2name rs ^ "\n"
 
     in
@@ -376,7 +376,7 @@ struct
    | Nop => {def=RegSet.empty, use=RegSet.empty}
    | J _ => {def=RegSet.empty, use=RegSet.empty}
    | Leave => {def=list2set[reg "%esp", reg "%ebp"], use=list2set[reg "%ebp"]}
-   | Ret => {def=list2set[reg "%eip"], use=RegSet.empty}
+   | Ret => {def=RegSet.empty, use=list2set(reg "%eax"::calleeSaved)}
    | Push(r) => {def=RegSet.empty, use=list2set[r]}
    | Pop(r) => {def=list2set[r], use=RegSet.empty}
    | Branch2(c, l) => {def=RegSet.empty, use=RegSet.empty}

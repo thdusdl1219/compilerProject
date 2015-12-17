@@ -10,7 +10,7 @@ import time
 class Machine:
     def load(self, filename):
         outname = filename.split(".")[0]
-        exe = "gcc -o " + outname + " " + filename
+        exe = "gcc -o " + outname + " " + filename + " -m32"
         exe = shlex.split(exe)
         subprocess.Popen(exe)
 
