@@ -188,7 +188,10 @@ structure Codegen :> CODEGEN =
                         end
               | A.Get => let val r1 = gen_exp env (hd expl); val r = M.newReg()
                         in emit (M.Lw(r, (M.immed 0, r1))); r end
-              | A.Set => let val r1 = gen_exp env (hd expl); val r2 = gen_exp env (List.nth(expl, 1)) in emit (M.Sw(r2, (M.immed 0, r1))); r1 end (* I don't know what is return.. *)
+              | A.Set => let val r1 = gen_exp env (hd expl); 
+                val r2 = gen_exp env (List.nth(expl, 1)) in 
+                  emit (M.Sw(r2, (M.immed 0, r1))); r2 
+                end (* I don't know what is return.. *)
               | A.Add => 
                   let val mop = fun2mips_arith_op(oper); val r = M.newReg() 
                     in (case (List.nth(expl,0), List.nth(expl, 1)) of
@@ -252,6 +255,38 @@ structure Codegen :> CODEGEN =
           let val r1 = gen_exp env exp; val r = M.newReg()
             in emit(M.Lw(r, (M.immed (i * data_size), r1))); r end
 
+        | gen (A.If( A.Op(A.LT, r1::[r2]), exp1, exp2)) =
+          let 
+            val else_lab = M.freshlab()
+            val r = M.newReg()
+            val done_lab = M.freshlab()
+          in
+            emit(M.Branch(M.Ge, gen_exp env r1, gen_exp env r2, else_lab));
+            emit_label(M.freshlab());
+            emit(M.Move(r, gen_exp env exp1));
+            emit(M.J(done_lab));
+            emit_label(else_lab);
+            emit(M.Move(r, gen_exp env exp2));
+            emit_label(done_lab);
+            r
+          end
+
+        | gen (A.If( A.Op(A.Eq, r1::[r2]), exp1, exp2)) =
+          let 
+            val else_lab = M.freshlab()
+            val r = M.newReg()
+            val done_lab = M.freshlab()
+          in
+            emit(M.Branch(M.Ne, gen_exp env r1, gen_exp env r2, else_lab));
+            emit_label(M.freshlab());
+            emit(M.Move(r, gen_exp env exp1));
+            emit(M.J(done_lab));
+            emit_label(else_lab);
+            emit(M.Move(r, gen_exp env exp2));
+            emit_label(done_lab);
+            r
+          end
+
         | gen (A.If (exp1, exp2, exp3)) =
           let val else_lab = M.freshlab (); val r = M.newReg(); val done_lab = M.freshlab ()
           in (
@@ -273,10 +308,21 @@ structure Codegen :> CODEGEN =
                   emit(M.Move(r, gen_exp env exp2)) ; emit(M.J(done_lab)); emit_label (else_lab) ; emit(M.Move(r, gen_exp env exp3)) ; emit_label (done_lab); r)
             ) 
           end
+
         | gen (A.While(exp1, exp2)) = 
           let val check_lab = M.freshlab (); val done_lab = M.freshlab (); val r = M.newReg() 
-            in emit_label(check_lab); emit(M.Branchz(M.Eq, gen_exp env exp1, done_lab));emit_label(M.freshlab());
-            emit(M.Move(r, gen_exp env exp2)); emit(M.J(check_lab)); emit_label(done_lab); r end (* I don't know what is return... *)
+            in 
+              emit_label(check_lab);
+              (case (exp1) of
+                A.Op(A.LT, r1::[r2]) => emit(M.Branch(M.Ge, gen_exp env r1, gen_exp env r2, done_lab))
+                | A.Op(A.Eq, r1::[r2]) => emit(M.Branch(M.Ne, gen_exp env r1, gen_exp env r2, done_lab))
+                | _ => emit(M.Branchz(M.Eq, gen_exp env exp1, done_lab))
+              );
+              emit_label(M.freshlab());
+              emit(M.Move(r, gen_exp env exp2));
+              emit(M.J(check_lab)); 
+              emit_label(done_lab); r 
+            end (* I don't know what is return... *)
         | gen (A.Call(A.Id fid, exp2)) =
             let val res_tmp = M.newReg(); val arg_tmp = M.newReg()
             in
