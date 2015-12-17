@@ -16,4 +16,4 @@ fun main (x:int):int =
 			else
 				sum := sumv+addition
 		);
-		!sum
+		printint(!sum); !sum

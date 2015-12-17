@@ -9,9 +9,9 @@ let x = (5 + 3) * 7 in
 let y = x + 7 in
   if gt (<x, 0>) then 
     if not x = 7 then
-      addsome(add(<x,y>))
-    else -1
-  else if -2 then 0 else 1
+      (printint(addsome(add(<x,y>)));0)
+    else (printint(-1);-1)
+  else if -2 then (printint(0);0) else (printint(1);1)
 
 /*
 fun decfac(x:int):int = fac (x-1)

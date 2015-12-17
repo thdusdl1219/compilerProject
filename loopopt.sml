@@ -203,7 +203,7 @@ fun findLoops cfg map =
 					| 1 => let
 						val [header] = BBSet.listItems backto
 						val body = doDFS (BBSet.empty) header (block, BBSet.empty)
-						val _ = print ("*** Found Loop : header("^bb2string header^") and body("^bbset2string body^")\n")
+						(*val _ = print ("*** Found Loop : header("^bb2string header^") and body("^bbset2string body^")\n")*)
 					in
 						(header,body)::looplist
 					end
@@ -234,7 +234,6 @@ fun defsInBody (body:BBSet.set):RS.set =
 
 fun invariantsInBody (alldefs:RS.set) (invariants:RS.set) (body:BBSet.set):RS.set =
 	let 
-		val _ = print "invariantsInBody\n"
 		fun isInvariant (instruction:M.instruction) =
 			let
 				fun useRegInvariant (r:M.reg, isit:bool) = 
@@ -337,7 +336,7 @@ fun singleDefsInBody (body:BBSet.set):RS.set =
 	end
 fun addPreheaderToFunCode (h::t) header preheaderInsts =
 	let
-	    val _ = print "addPreheaderToFunCode\n"
+	    (*val _ = print "addPreheaderToFunCode\n"*)
 		val (headerLab,_) = header
 		val (thisLab,_) = h
 	in
@@ -389,23 +388,17 @@ fun optimize (funCode:M.funcode) : M.funcode =
 					end
 
 				val (headerLab,_) = header
-				val _ = print "doing preheader liveness\n"
 				val SOME liveoutOfPreheader = Symbol.look( 
 					Liveness.analyze 
 					{mention=(fn (x:M.reg) => ()),interfere=(fn (x:M.reg) => ( fn (y:M.reg) => ()))} 
 					funCode,
 					 headerLab )
-				val _ = print "finding defs\n"
 				val defset = defsInBody (body)
-				val _ = print "finding single def registers\n"
 				val singledefs = singleDefsInBody (body)
-				val _ = print "invariants: \n"
 				val invariants = RS.difference( 
 					RS.intersection( invariantsInBody defset RS.empty (body), singledefs), 
 					liveoutOfPreheader )
-				val _ = print_set invariants
 
-				val _ = print "doing modification..\n"
 				val preheaderInsts = foldl (extractInvariantInsts invariants) [] code
 				val funCodeAfterRemoval = List.map (removeInvariantInsts invariants) code
 				val newFunCode = addPreheaderToFunCode funCodeAfterRemoval header preheaderInsts
@@ -414,14 +407,9 @@ fun optimize (funCode:M.funcode) : M.funcode =
 			end
 
 		val g = CFG.newGraph()
-		val _ = print "making CFG \n"
 		val _ = makeCFG g funCode
-		val _ = print "done making CFG \n"
 		val domMap = makeDomMap g (hd(funCode))
-		val _ = print "done make dommap\n"
-		val _ = dumpDomMap domMap
 		val loops = findLoops g domMap
-		val _ = print "done make loop\n"
 
 		(*val _ = optimizeLoops loops*)
 		(*val _ = print ("###### DomMap\n")*)
