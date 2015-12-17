@@ -71,7 +71,7 @@ structure Codegen :> CODEGEN =
          emit (M.Li(arg_tmp, size));
          emit (M.Push(arg_tmp));
          emit (M.Jal(alloc_lab));
-         emit (M.Pop(arg_tmp));
+         emit(M.Arithi(M.Addi, M.reg "%esp", M.reg "%esp", M.immed 4));
          emit (M.Move(ret_reg, M.reg("%eax")))
          )
       end
@@ -288,7 +288,7 @@ structure Codegen :> CODEGEN =
                | SOME (Lab lab) =>
                   emit (M.Jal lab)
                | NONE => E.impossible("Can't find " ^ Symbol.name fid);
-               emit(M.Pop(arg_tmp));
+               emit(M.Arithi(M.Addi, M.reg "%esp", M.reg "%esp", M.immed 4));
                emit(M.Move(res_tmp, M.reg("%eax")));
                res_tmp)
             end
@@ -297,7 +297,8 @@ structure Codegen :> CODEGEN =
           let val r1 = M.newReg(); val r2 = M.newReg(); val r3 = M.newReg(); val r = M.newReg() in
             emit(M.Move(r1, gen_exp env exp1)); emit(M.Move(r2, gen_exp env exp2)); emit(M.Move(r3, r1));
             emit(M.Push(r2)); emit(M.Jalr(M.reg "%eip", r3, M.reg "%eax" ::((M.reg "%eip") ::M.callerSaved), [])); 
-            emit(M.Pop(r2)); emit(M.Move(r, M.reg "%eax")); r end (* jalr 잘 모르겠당. *) 
+            emit(M.Arithi(M.Addi, M.reg "%esp", M.reg "%esp", M.immed 4));
+            emit(M.Move(r, M.reg "%eax")); r end (* jalr 잘 모르겠당. *) 
         | gen (A.Let(id1, exp1, exp2)) = 
           let val env = Symbol.enter(env, id1, Reg(gen_exp env exp1)) in gen_exp env
           exp2 end
